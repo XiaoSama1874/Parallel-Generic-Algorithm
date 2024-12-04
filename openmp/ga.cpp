@@ -5,6 +5,7 @@
 #include <random>
 #include <limits>
 #include <vector>
+#include <omp.h>
 
 using namespace std;
 
@@ -28,6 +29,7 @@ struct City {
 // 初始化城市位置
 City* initializeCities() {
     City* cities = new City[CITY_COUNT];
+    #pragma omp parallel for
     for (int i = 0; i < CITY_COUNT; ++i) {
         cities[i] = {rand() % 100, rand() % 100};
     }
@@ -37,6 +39,7 @@ City* initializeCities() {
 // 预计算城市之间的距离并存储在二维数组中
 double** calculateDistanceMatrix(const City* cities) {
     double** distanceMatrix = new double*[CITY_COUNT];
+    #pragma omp parallel for
     for (int i = 0; i < CITY_COUNT; ++i) {
         distanceMatrix[i] = new double[CITY_COUNT];
         for (int j = 0; j < CITY_COUNT; ++j) {
@@ -54,6 +57,7 @@ double** calculateDistanceMatrix(const City* cities) {
 // 计算路径的总距离
 double calculatePathDistance(const int* path, double** distanceMatrix) {
     double totalDistance = 0.0;
+    #pragma omp parallel for reduction(+:totalDistance)
     for (int i = 0; i < CITY_COUNT - 1; ++i) {
         totalDistance += distanceMatrix[path[i]][path[i + 1]];
     }
@@ -72,6 +76,7 @@ int* randomPath(int* templatePath) {
 // 初始化种群
 int** initializePopulation(int* templatePath) {
     int** population = new int*[POPULATION_SIZE];
+    #pragma omp parallel for
     for (int i = 0; i < POPULATION_SIZE; ++i) {
         population[i] = randomPath(templatePath);
     }
@@ -101,6 +106,7 @@ int* crossover(const int* parent1, const int* parent2) {
     if (start > end) swap(start, end);
 
     // 保留区间[start, end]的基因
+    #pragma omp parallel for
     for (int i = start; i <= end; ++i) {
         offspring[i] = parent1[i];
     }
@@ -141,6 +147,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
     for (int generation = 0; generation < GENERATIONS; ++generation) {
         // 计算适应度和总适应度
         double totalFitness = 0.0;
+        #pragma omp parallel for reduction(+:totalFitness)
         for (int i = 0; i < POPULATION_SIZE; ++i) {
             fitness[i] = 1.0 / calculatePathDistance(population[i], distanceMatrix);
             totalFitness += fitness[i];
@@ -171,6 +178,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
         }
 
         // 释放旧种群
+        #pragma omp parallel for
         for (int i = 0; i < POPULATION_SIZE; ++i) {
             delete[] population[i];
         }
@@ -181,6 +189,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
         // 打印当前代的最优距离
         if (PRINT_EACH_ITERATION) {
             double bestDistance = numeric_limits<double>::max();
+            #pragma omp parallel for reduction(min:bestDistance)
             for (int i = 0; i < POPULATION_SIZE; ++i) {
                 double distance = calculatePathDistance(population[i], distanceMatrix);
                 if (distance < bestDistance) {
@@ -205,6 +214,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
     }
 
     // 清理内存
+    #pragma omp parallel for
     for (int i = 0; i < POPULATION_SIZE; ++i) {
         delete[] population[i];
     }
@@ -229,6 +239,7 @@ int main() {
     cout << endl;
 
     delete[] bestPath;
+    #pragma omp parallel for
     for (int i = 0; i < CITY_COUNT; ++i) {
         delete[] distanceMatrix[i];
     }
