@@ -6,8 +6,11 @@
 #include <limits>
 #include <vector>
 #include <omp.h>
+#include <chrono>
 
 using namespace std;
+using std::chrono::high_resolution_clock;
+using std::chrono::duration;
 
 const int CITY_COUNT = 100;       // 城市数量
 const int POPULATION_SIZE = 1000; // 种群规模
@@ -15,7 +18,7 @@ const int GENERATIONS = 1000;     // 迭代次数
 const double MUTATION_RATE = 0.1; // 变异率
 const double MUTATION_PROB = 0.5; // 变异概率
 const double ELITISM_THRESHOLD = 0.2; // 精英保留比例（20%）
-const bool PRINT_EACH_ITERATION = true; // 是否打印每次迭代的最优距离
+const bool PRINT_EACH_ITERATION = false; // 是否打印每次迭代的最优距离
 
 random_device rd;
 mt19937 gen(rd());
@@ -239,7 +242,11 @@ int main() {
     City* cities = initializeCities();
     double** distanceMatrix = calculateDistanceMatrix(cities);
 
+    high_resolution_clock::time_point start = high_resolution_clock::now();
     int* bestPath = geneticAlgorithm(cities, distanceMatrix);
+    high_resolution_clock::time_point end = high_resolution_clock::now();
+    duration<double, std::milli> duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
+    cout <<"Time usage:" << duration_sec.count() << endl;
 
     cout << "最优路径:" << endl;
     for (int i = 0; i < CITY_COUNT; ++i) {
