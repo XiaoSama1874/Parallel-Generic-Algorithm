@@ -20,6 +20,8 @@ const bool PRINT_EACH_ITERATION = true; // 是否打印每次迭代的最优距�
 random_device rd;
 mt19937 gen(rd());
 uniform_real_distribution<> dis(0.0, 1.0);
+uniform_int_distribution<> city_dist(0, CITY_COUNT-1);
+uniform_int_distribution<> city_coord_dist(0, 100);
 
 // 城市结构
 struct City {
@@ -31,7 +33,7 @@ City* initializeCities() {
     City* cities = new City[CITY_COUNT];
     #pragma omp parallel for
     for (int i = 0; i < CITY_COUNT; ++i) {
-        cities[i] = {rand() % 100, rand() % 100};
+        cities[i] = {city_coord_dist(gen), city_coord_dist(gen)};
     }
     return cities;
 }
@@ -101,8 +103,8 @@ int* crossover(const int* parent1, const int* parent2) {
     int* offspring = new int[CITY_COUNT];
     fill(offspring, offspring + CITY_COUNT, -1);
 
-    int start = rand() % CITY_COUNT;
-    int end = rand() % CITY_COUNT;
+    int start = city_dist(gen);
+    int end = city_dist(gen);
     if (start > end) swap(start, end);
 
     // 保留区间[start, end]的基因
@@ -129,8 +131,8 @@ int* crossover(const int* parent1, const int* parent2) {
 // 变异操作
 void mutate(int* individual, int generation) {
     if (dis(gen) < MUTATION_RATE) {
-        int i = rand() % CITY_COUNT;
-        int j = rand() % CITY_COUNT;
+        int i = city_dist(gen);
+        int j = city_dist(gen);
         swap(individual[i], individual[j]);
     }
 }
@@ -234,7 +236,6 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
 }
 
 int main() {
-    srand(time(0));
     City* cities = initializeCities();
     double** distanceMatrix = calculateDistanceMatrix(cities);
 
