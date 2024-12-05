@@ -155,13 +155,20 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
 
         // 精英保留
         int eliteCount = ELITISM_THRESHOLD * POPULATION_SIZE;
-        vector<pair<double, int>> fitnessWithIndex;
+        vector<pair<double, int>> fitnessWithIndex(POPULATION_SIZE);
+        #pragma omp parallel for
         for (int i = 0; i < POPULATION_SIZE; ++i) {
-            fitnessWithIndex.push_back({fitness[i], i});
+            fitnessWithIndex[i] = {fitness[i], i};
         }
-        sort(fitnessWithIndex.rbegin(), fitnessWithIndex.rend());
+        std::partial_sort(
+            fitnessWithIndex.begin(),
+            fitnessWithIndex.begin() + eliteCount,
+            fitnessWithIndex.end(),
+            std::greater<>()
+        );
 
         int** newPopulation = new int*[POPULATION_SIZE];
+        #pragma omp parallel for
         for (int i = 0; i < eliteCount; ++i) {
             int idx = fitnessWithIndex[i].second;
             newPopulation[i] = new int[CITY_COUNT];
@@ -169,6 +176,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
         }
 
         // 生成新种群
+        #pragma omp parallel for
         for (int i = eliteCount; i < POPULATION_SIZE; ++i) {
             int* parent1 = selectParent(population, fitness, totalFitness);
             int* parent2 = selectParent(population, fitness, totalFitness);
