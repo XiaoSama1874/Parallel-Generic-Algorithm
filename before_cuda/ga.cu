@@ -135,10 +135,10 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
         for (int i = 0; i < POPULATION_SIZE; ++i) {
             int* templatePath = population + i * CITY_COUNT;
             distances[i] = calculatePathDistance(templatePath, distanceMatrix);
-            fitness[i] = 1.0 / distances[i];
         }
 
         for (int i = 0; i < POPULATION_SIZE; ++i) {
+            fitness[i] = 1.0 / distances[i];
             totalFitness += fitness[i];
         }
 
