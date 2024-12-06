@@ -6,8 +6,11 @@
 #include <limits>
 #include <vector>
 #include <omp.h>
+#include <chrono>
 
 using namespace std;
+using std::chrono::high_resolution_clock;
+using std::chrono::duration;
 
 const int CITY_COUNT = 100;       // 城市数量
 const int POPULATION_SIZE = 1000; // 种群规模
@@ -15,11 +18,13 @@ const int GENERATIONS = 1000;     // 迭代次数
 const double MUTATION_RATE = 0.1; // 变异率
 const double MUTATION_PROB = 0.5; // 变异概率
 const double ELITISM_THRESHOLD = 0.2; // 精英保留比例（20%）
-const bool PRINT_EACH_ITERATION = true; // 是否打印每次迭代的最优距离
+const bool PRINT_EACH_ITERATION = false; // 是否打印每次迭代的最优距离
 
 random_device rd;
 mt19937 gen(rd());
 uniform_real_distribution<> dis(0.0, 1.0);
+uniform_int_distribution<> city_dist(0, CITY_COUNT-1);
+uniform_int_distribution<> city_coord_dist(0, 100);
 
 // 城市结构
 struct City {
@@ -31,7 +36,7 @@ City* initializeCities() {
     City* cities = new City[CITY_COUNT];
     #pragma omp parallel for
     for (int i = 0; i < CITY_COUNT; ++i) {
-        cities[i] = {rand() % 100, rand() % 100};
+        cities[i] = {city_coord_dist(gen), city_coord_dist(gen)};
     }
     return cities;
 }
@@ -101,8 +106,8 @@ int* crossover(const int* parent1, const int* parent2) {
     int* offspring = new int[CITY_COUNT];
     fill(offspring, offspring + CITY_COUNT, -1);
 
-    int start = rand() % CITY_COUNT;
-    int end = rand() % CITY_COUNT;
+    int start = city_dist(gen);
+    int end = city_dist(gen);
     if (start > end) swap(start, end);
 
     // 保留区间[start, end]的基因
@@ -129,8 +134,8 @@ int* crossover(const int* parent1, const int* parent2) {
 // 变异操作
 void mutate(int* individual, int generation) {
     if (dis(gen) < MUTATION_RATE) {
-        int i = rand() % CITY_COUNT;
-        int j = rand() % CITY_COUNT;
+        int i = city_dist(gen);
+        int j = city_dist(gen);
         swap(individual[i], individual[j]);
     }
 }
@@ -155,13 +160,20 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
 
         // 精英保留
         int eliteCount = ELITISM_THRESHOLD * POPULATION_SIZE;
-        vector<pair<double, int>> fitnessWithIndex;
+        vector<pair<double, int>> fitnessWithIndex(POPULATION_SIZE);
+        #pragma omp parallel for
         for (int i = 0; i < POPULATION_SIZE; ++i) {
-            fitnessWithIndex.push_back({fitness[i], i});
+            fitnessWithIndex[i] = {fitness[i], i};
         }
-        sort(fitnessWithIndex.rbegin(), fitnessWithIndex.rend());
+        std::partial_sort(
+            fitnessWithIndex.begin(),
+            fitnessWithIndex.begin() + eliteCount,
+            fitnessWithIndex.end(),
+            std::greater<>()
+        );
 
         int** newPopulation = new int*[POPULATION_SIZE];
+        #pragma omp parallel for
         for (int i = 0; i < eliteCount; ++i) {
             int idx = fitnessWithIndex[i].second;
             newPopulation[i] = new int[CITY_COUNT];
@@ -169,6 +181,7 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
         }
 
         // 生成新种群
+        #pragma omp parallel for
         for (int i = eliteCount; i < POPULATION_SIZE; ++i) {
             int* parent1 = selectParent(population, fitness, totalFitness);
             int* parent2 = selectParent(population, fitness, totalFitness);
@@ -226,11 +239,14 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
 }
 
 int main() {
-    srand(time(0));
     City* cities = initializeCities();
     double** distanceMatrix = calculateDistanceMatrix(cities);
 
+    high_resolution_clock::time_point start = high_resolution_clock::now();
     int* bestPath = geneticAlgorithm(cities, distanceMatrix);
+    high_resolution_clock::time_point end = high_resolution_clock::now();
+    duration<double, std::milli> duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
+    cout <<"Time usage:" << duration_sec.count() << endl;
 
     cout << "最优路径:" << endl;
     for (int i = 0; i < CITY_COUNT; ++i) {
