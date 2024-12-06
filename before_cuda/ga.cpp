@@ -40,7 +40,7 @@ City* initializeCities() {
     return cities;
 }
 
-// 预计算城市之间的距离并存储在二维数组中
+// 预计算城市之间的距离并存储在二维数组中 cuda
 double* calculateDistanceMatrix(const City* cities) {
     double* distanceMatrix;
     distanceMatrix = new double[CITY_COUNT * CITY_COUNT];
@@ -128,9 +128,12 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
     int* population = initializePopulation();
     double* fitness = new double[POPULATION_SIZE];
 
+    omp_set_num_threads(13);
+
     for (int generation = 0; generation < GENERATIONS; ++generation) {
-        // 计算适应度和总适应度
+        // 计算适应度和总适应度 // cuda
         double totalFitness = 0.0;
+        #pragma omp parallel for reduction(+:totalFitness)
         for (int i = 0; i < POPULATION_SIZE; ++i) {
             int* templatePath = population + i * CITY_COUNT;
             fitness[i] = 1.0 / calculatePathDistance(templatePath, distanceMatrix);
@@ -158,7 +161,8 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
             copy(population_idx, population_idx + CITY_COUNT, newPopulation_i);
         }
 
-        // 生成新种群
+        // 生成新种群 // cuda
+        #pragma omp parallel for
         for (int i = eliteCount; i < POPULATION_SIZE; ++i) {
             int parent1Idx = selectParentIdx(fitness, totalFitness);
             int* parent1 = population + parent1Idx*CITY_COUNT;
@@ -171,7 +175,6 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
 
         // 释放旧种群
         delete[] population;
-
         population = newPopulation;
 
         // 打印当前代的最优距离
