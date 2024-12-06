@@ -146,6 +146,8 @@ int* geneticAlgorithm(City* cities, double** distanceMatrix) {
     int* templatePath = new int[CITY_COUNT];
     iota(templatePath, templatePath + CITY_COUNT, 0);
 
+    omp_set_num_threads(10);
+
     int** population = initializePopulation(templatePath);
     double* fitness = new double[POPULATION_SIZE];
 
