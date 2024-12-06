@@ -126,6 +126,7 @@ void mutate(int* individual, int generation) {
 // 主遗传算法函数
 int* geneticAlgorithm(City* cities, double* distanceMatrix) {
     int* population = initializePopulation();
+    double* distances = new double[POPULATION_SIZE];
     double* fitness = new double[POPULATION_SIZE];
     for (int generation = 0; generation < GENERATIONS; ++generation) {
         // 计算适应度和总适应度 // cuda
@@ -133,7 +134,11 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
         // #pragma omp parallel for reduction(+:totalFitness)
         for (int i = 0; i < POPULATION_SIZE; ++i) {
             int* templatePath = population + i * CITY_COUNT;
-            fitness[i] = 1.0 / calculatePathDistance(templatePath, distanceMatrix);
+            distances[i] = calculatePathDistance(templatePath, distanceMatrix);
+            fitness[i] = 1.0 / distances[i];
+        }
+
+        for (int i = 0; i < POPULATION_SIZE; ++i) {
             totalFitness += fitness[i];
         }
 
@@ -178,8 +183,7 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
         if (PRINT_EACH_ITERATION) {
             double bestDistance = numeric_limits<double>::max();
             for (int i = 0; i < POPULATION_SIZE; ++i) {
-                int* population_i = population + i*CITY_COUNT;
-                double distance = calculatePathDistance(population_i, distanceMatrix);
+                double distance = distances[i];
                 if (distance < bestDistance) {
                     bestDistance = distance;
                 }
@@ -193,7 +197,7 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
     int* bestPath = nullptr;
     for (int i = 0; i < POPULATION_SIZE; ++i) {
         int* population_i = population + i*CITY_COUNT;
-        double distance = calculatePathDistance(population_i, distanceMatrix);
+        double distance = distances[i];
         if (distance < bestDistance) {
             bestDistance = distance;
             if (bestPath) delete[] bestPath;
