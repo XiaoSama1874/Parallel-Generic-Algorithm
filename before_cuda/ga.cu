@@ -1,4 +1,5 @@
 #include "ga_helper.cuh"
+#include "ga_helper2.cuh"
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -54,13 +55,13 @@ City* initializeCities() {
 // }
 
 // 计算路径的总距离
-double calculatePathDistance(const int* path, double* distanceMatrix) {
-    double totalDistance = distanceMatrix[path[CITY_COUNT - 1]*CITY_COUNT + path[0]]; // 返回到起点
-    for (int i = 0; i < CITY_COUNT - 1; ++i) {
-        totalDistance += distanceMatrix[path[i]*CITY_COUNT + path[i + 1]];
-    }
-    return totalDistance;
-}
+// double calculatePathDistance(const int* path, double* distanceMatrix) {
+//     double totalDistance = distanceMatrix[path[CITY_COUNT - 1]*CITY_COUNT + path[0]]; // 返回到起点
+//     for (int i = 0; i < CITY_COUNT - 1; ++i) {
+//         totalDistance += distanceMatrix[path[i]*CITY_COUNT + path[i + 1]];
+//     }
+//     return totalDistance;
+// }
 
 // 初始化种群
 int* initializePopulation() {
@@ -124,21 +125,16 @@ void mutate(int* individual, int generation) {
 
 
 // 主遗传算法函数
-int* geneticAlgorithm(City* cities, double* distanceMatrix) {
+int* geneticAlgorithm(City* cities, double* distanceMatrix, int threadsPerBlock) {
     int* population = initializePopulation();
-    double* distances = new double[POPULATION_SIZE];
+    double* sumDistances = new double[POPULATION_SIZE];
     double* fitness = new double[POPULATION_SIZE];
     for (int generation = 0; generation < GENERATIONS; ++generation) {
         // 计算适应度和总适应度 // cuda
         double totalFitness = 0.0;
-        // #pragma omp parallel for reduction(+:totalFitness)
+        sumDistances = calculateSumDistances(population, distanceMatrix, POPULATION_SIZE, CITY_COUNT, threadsPerBlock);
         for (int i = 0; i < POPULATION_SIZE; ++i) {
-            int* templatePath = population + i * CITY_COUNT;
-            distances[i] = calculatePathDistance(templatePath, distanceMatrix);
-        }
-
-        for (int i = 0; i < POPULATION_SIZE; ++i) {
-            fitness[i] = 1.0 / distances[i];
+            fitness[i] = 1.0 / sumDistances[i];
             totalFitness += fitness[i];
         }
 
@@ -183,7 +179,7 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
         if (PRINT_EACH_ITERATION) {
             double bestDistance = numeric_limits<double>::max();
             for (int i = 0; i < POPULATION_SIZE; ++i) {
-                double distance = distances[i];
+                double distance = sumDistances[i];
                 if (distance < bestDistance) {
                     bestDistance = distance;
                 }
@@ -197,7 +193,7 @@ int* geneticAlgorithm(City* cities, double* distanceMatrix) {
     int* bestPath = nullptr;
     for (int i = 0; i < POPULATION_SIZE; ++i) {
         int* population_i = population + i*CITY_COUNT;
-        double distance = distances[i];
+        double distance = sumDistances[i];
         if (distance < bestDistance) {
             bestDistance = distance;
             if (bestPath) delete[] bestPath;
@@ -225,7 +221,7 @@ int main() {
     }
     double* distanceMatrix = calculateDistanceMatrix(hCityX, hCityY, CITY_COUNT, threadsPerBlock);
     high_resolution_clock::time_point start = high_resolution_clock::now();
-    int* bestPath = geneticAlgorithm(cities, distanceMatrix);
+    int* bestPath = geneticAlgorithm(cities, distanceMatrix, threadsPerBlock);
     high_resolution_clock::time_point end = high_resolution_clock::now();
     duration<double, std::milli> duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
     cout <<"Time usage:" << duration_sec.count() << endl;
