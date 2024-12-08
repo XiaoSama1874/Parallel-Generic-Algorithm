@@ -1,0 +1,1 @@
+nvcc final_ga.cu -Xcompiler -O3 -Xcompiler -Wall -Xptxas -O3 -std c++17 -o final_ga

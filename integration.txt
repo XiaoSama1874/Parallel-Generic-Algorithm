@@ -1,0 +1,30 @@
+#!/usr/bin/env zsh
+
+#SBATCH -p instruction
+
+#SBATCH -c 1
+#SBATCH --gpus=1
+#SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=8
+#SBATCH -J task1_slurm
+#SBATCH -o %x.out -e %x.err
+#SBATCH --time=0-00:10:00
+
+# sbatch task1.sh
+
+module load nvidia/cuda/11.8.0
+module load gcc/11.3.0
+
+nvcc cuda/ga_cuda.cu -Xcompiler -O3 -Xcompiler -Wall -Xptxas -O3 -std c++17 -o ga_cuda
+g++ omp/ga_omp.cpp -Wall -O3 -std=c++17 -fopenmp -o ga_omp
+g++ sequential/ga_sequential.cpp -Wall -O3 -std=c++17 -o ga_sequential
+
+# Define population sizes to test
+POPULATION_SIZES=(100 500 1000 2000 3000 5000 8000 10000)
+
+echo "ga_cuda"
+./ga_cuda 500 1000 1000 false
+echo "ga_omp"
+./ga_omp 500 1000 1000 false
+echo "ga_sequential"
+./ga_sequential 500 1000 1000 false
