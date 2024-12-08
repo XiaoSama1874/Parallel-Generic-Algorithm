@@ -447,9 +447,12 @@ int main(int argc, char* argv[])
         }
     }
 
-    cout << "CITY_COUNT=" << CITY_COUNT << ", POPULATION_SIZE=" << POPULATION_SIZE
-         << ", GENERATIONS=" << GENERATIONS
-         << ", PRINT_EACH_ITERATION=" << (PRINT_EACH_ITERATION ? "true" : "false") << endl;
+    if(PRINT_EACH_ITERATION){
+        cout << "CITY_COUNT=" << CITY_COUNT << ", POPULATION_SIZE=" << POPULATION_SIZE
+            << ", GENERATIONS=" << GENERATIONS
+            << ", PRINT_EACH_ITERATION=" << (PRINT_EACH_ITERATION ? "true" : "false") << endl;
+    }
+
 
     City *cities = initializeCities();
     double *h_distMat = computeDistanceMatrix(cities);

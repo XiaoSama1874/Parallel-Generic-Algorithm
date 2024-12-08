@@ -259,12 +259,14 @@ void geneticAlgorithm(City* cities, double** distanceMatrix) {
         copy(population[bestDistanceIndex], population[bestDistanceIndex] + CITY_COUNT, route);
     }
 
-    cout << "Best path:" << endl;
-    for (int i = 0; i < CITY_COUNT; ++i) {
-        cout << route[i] << " ";
+    if(PRINT_EACH_ITERATION){
+        cout << "Best path:" << endl;
+        for (int i = 0; i < CITY_COUNT; ++i) {
+            cout << route[i] << " ";
+        }
+        cout << endl;
     }
-    cout << endl;
-
+ 
     // Cleanup memory
     for (int i = 0; i < POPULATION_SIZE; ++i) {
         delete[] population[i];
@@ -289,10 +291,11 @@ int main(int argc, char* argv[]) {
             PRINT_EACH_ITERATION = true;
         }
     }
-
-    cout << "CITY_COUNT=" << CITY_COUNT << ", POPULATION_SIZE=" << POPULATION_SIZE
-         << ", GENERATIONS=" << GENERATIONS
-         << ", PRINT_EACH_ITERATION=" << (PRINT_EACH_ITERATION ? "true" : "false") << endl;
+    if(PRINT_EACH_ITERATION){
+        cout << "CITY_COUNT=" << CITY_COUNT << ", POPULATION_SIZE=" << POPULATION_SIZE
+            << ", GENERATIONS=" << GENERATIONS
+            << ", PRINT_EACH_ITERATION=" << (PRINT_EACH_ITERATION ? "true" : "false") << endl;
+    }
 
     City* cities = initializeCities();
     double** distanceMatrix = calculateDistanceMatrix(cities);
@@ -304,7 +307,12 @@ int main(int argc, char* argv[]) {
     high_resolution_clock::time_point end = high_resolution_clock::now();
     duration<double, std::milli> duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
 
-    cout <<"Time usage:" << duration_sec.count() << " ms" << endl;
+    if(PRINT_EACH_ITERATION){
+        cout << duration_sec.count() << endl;
+    }else{
+        cout <<"Time usage:" << duration_sec.count() << " ms" << endl;
+    }
+
 
     for (int i = 0; i < CITY_COUNT; ++i) {
         delete[] distanceMatrix[i];
