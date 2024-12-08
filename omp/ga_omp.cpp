@@ -308,9 +308,9 @@ int main(int argc, char* argv[]) {
     duration<double, std::milli> duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
 
     if(PRINT_EACH_ITERATION){
-        cout << duration_sec.count() << endl;
-    }else{
         cout <<"Time usage:" << duration_sec.count() << " ms" << endl;
+    }else{
+        cout << duration_sec.count() << endl;
     }
 
 

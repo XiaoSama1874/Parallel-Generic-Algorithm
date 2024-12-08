@@ -319,7 +319,6 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
 
     double *result_check_fitness = new double[POPULATION_SIZE];
 
-    cout << "finish initialization" << endl;
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
         // Compute fitness
@@ -412,13 +411,14 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
     int *h_solution = new int[CITY_COUNT];
     CUDA_CHECK(cudaMemcpy(h_solution, d_population + bestIdx * CITY_COUNT, CITY_COUNT * sizeof(int), cudaMemcpyDeviceToHost));
 
-    double bestDistance = 1.0 / bestFit;
-    cout << "Best distance: " << bestDistance << endl;
-    cout << "Best path:" << endl;
-    for (int i = 0; i < CITY_COUNT; i++)
-        cout << h_solution[i] << " ";
-    cout << "\n";
-
+    if (PRINT_EACH_ITERATION){
+        double bestDistance = 1.0 / bestFit;
+        cout << "Best distance: " << bestDistance << endl;
+        cout << "Best path:" << endl;
+        for (int i = 0; i < CITY_COUNT; i++)
+            cout << h_solution[i] << " ";
+        cout << "\n";
+    }
 
     delete[] h_solution;
     delete[] h_fitness;
@@ -469,7 +469,12 @@ int main(int argc, char* argv[])
     CUDA_CHECK(cudaEventRecord(stop));
     CUDA_CHECK(cudaEventSynchronize(stop));
     CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-    cout << "Time (ms): " << ms << endl;
+    
+    if(PRINT_EACH_ITERATION){
+        cout <<"Time usage:" << ms << " ms" << endl;
+    }else{
+        cout << ms << endl;
+    }
 
     delete[] h_distMat;
     delete[] cities;
