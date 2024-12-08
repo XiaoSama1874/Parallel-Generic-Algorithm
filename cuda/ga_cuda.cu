@@ -419,11 +419,10 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
         cout << h_solution[i] << " ";
     cout << "\n";
 
-    // Cleanup
+
     delete[] h_solution;
     delete[] h_fitness;
     delete[] result_check_fitness; 
-    // Removed delete[] cities; from here to avoid double free.
 
     cudaFree(d_population);
     cudaFree(d_newPopulation);

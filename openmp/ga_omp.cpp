@@ -15,7 +15,7 @@ using std::chrono::duration;
 int CITY_COUNT = 100;       // city scale
 int POPULATION_SIZE = 1000; // population scale
 int GENERATIONS = 1000;     // iteration times
-const double MUTATION_RATE = 0.1;     // mutation rate
+const double MUTATION_RATE = 0.2;     // mutation rate
 const double ELITISM_THRESHOLD = 0.2; // elite
 bool PRINT_EACH_ITERATION = true;     // print each iteration's best distance
 const int TOURNAMENT_SIZE = 5;        // For tournament selection
@@ -79,8 +79,6 @@ int** initializePopulation(int* templatePath) {
     }
     return population;
 }
-
-// ------------------- Extracted Functions ---------------------- //
 
 int* tournamentSelection(int** population, double* fitness, mt19937& local_gen) {
     uniform_int_distribution<int> popDist(0, POPULATION_SIZE - 1);
@@ -148,7 +146,6 @@ void mutate(int* individual, mt19937& local_gen) {
     }
 }
 
-// ------------------- Genetic Algorithm ---------------------- //
 
 void geneticAlgorithm(City* cities, double** distanceMatrix) {
     int* templatePath = new int[CITY_COUNT];

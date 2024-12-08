@@ -26,7 +26,7 @@ using namespace std;
 int CITY_COUNT = 100;                 // city scale
 int POPULATION_SIZE = 1000;           // population scale
 int GENERATIONS = 1000;               // iteration times
-const double MUTATION_RATE = 0.1;     // mutation rate
+const double MUTATION_RATE = 0.2;     // mutation rate
 const double ELITISM_THRESHOLD = 0.2; // elite
 bool PRINT_EACH_ITERATION = true;     // debug
 const int TOURNAMENT_SIZE = 5;        // For tournament selection
