@@ -47,7 +47,15 @@ __global__ void initRNGStates(curandState_t *states, unsigned long seed, int POP
 // GPU kernel: compute fitness
 __global__ void computeFitnessKernel(const int *population, const double *distanceMatrix, double *fitness, int POPULATION_SIZE, int CITY_COUNT)
 {
+    extern __shared__ double sharedDistanceMatrix[];
+    int sharedMatrixSize = CITY_COUNT * CITY_COUNT;
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    for (int i = threadId; i < sharedMatrixSize; i += blockDim.x)
+    {
+        sharedDistanceMatrix[i] = distanceMatrix[i];
+    }
+    __syncthreads();
+
     if (idx < POPULATION_SIZE)
     {
         double totalDist = 0.0;
@@ -56,12 +64,12 @@ __global__ void computeFitnessKernel(const int *population, const double *distan
         {
             int c1 = population[base + i];
             int c2 = population[base + i + 1];
-            totalDist += distanceMatrix[c1 * CITY_COUNT + c2];
+            totalDist += sharedDistanceMatrix[c1 * CITY_COUNT + c2];
         }
         // return to start
         int c1 = population[base + CITY_COUNT - 1];
         int c2 = population[base];
-        totalDist += distanceMatrix[c1 * CITY_COUNT + c2];
+        totalDist += sharedDistanceMatrix[c1 * CITY_COUNT + c2];
 
         fitness[idx] = 1.0 / totalDist;
     }
@@ -315,14 +323,14 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
     int halfNonElite = nonEliteCount / 2;
     int cb = (nonEliteCount + threads - 1) / threads;
     int mutation_blocks = (nonEliteCount + threads - 1) / threads;
-
+    int sharedMemSize = CITY_COUNT * CITY_COUNT * sizeof(double);
 
     double *result_check_fitness = new double[POPULATION_SIZE];
 
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
         // Compute fitness
-        computeFitnessKernel<<<blocks, threads>>>(d_population, d_distanceMatix, d_fitness, POPULATION_SIZE, CITY_COUNT);
+        computeFitnessKernel<<<blocks, threads,sharedMemSize>>>(d_population, d_distanceMatix, d_fitness, POPULATION_SIZE, CITY_COUNT);
         cudaDeviceSynchronize();
 
         // Copy fitness to host and do elitism
