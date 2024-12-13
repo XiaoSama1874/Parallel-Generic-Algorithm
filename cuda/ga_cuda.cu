@@ -25,8 +25,8 @@ using namespace std;
 int CITY_COUNT = 100;                 // city scale
 int POPULATION_SIZE = 1000;           // population scale
 int GENERATIONS = 1000;               // iteration times
-const double MUTATION_RATE = 0.1;     // mutation rate
-const double ELITISM_THRESHOLD = 0.2; // elite
+const float MUTATION_RATE = 0.1;     // mutation rate
+const float ELITISM_THRESHOLD = 0.2; // elite
 bool PRINT_EACH_ITERATION = true;     // debug
 const int TOURNAMENT_SIZE = 5;        // For tournament selection
 struct City
@@ -45,41 +45,49 @@ __global__ void initRNGStates(curandState_t *states, unsigned long seed, int POP
 }
 
 // GPU kernel: compute fitness
-__global__ void computeFitnessKernel(const int *population, const double *distanceMatrix, double *fitness, int POPULATION_SIZE, int CITY_COUNT)
+__global__ void computeFitnessKernel(const int *population, const float *distanceMatrix, float *fitness, int POPULATION_SIZE, int CITY_COUNT)
 {
+    extern __shared__ float sharedDistanceMatrix[];
+    int sharedMatrixSize = CITY_COUNT * CITY_COUNT;
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    for (int i = threadId; i < sharedMatrixSize; i += blockDim.x)
+    {
+        sharedDistanceMatrix[i] = distanceMatrix[i];
+    }
+    __syncthreads();
+
     if (idx < POPULATION_SIZE)
     {
-        double totalDist = 0.0;
+        float totalDist = 0.0;
         const int base = idx * CITY_COUNT;
         for (int i = 0; i < CITY_COUNT - 1; i++)
         {
             int c1 = population[base + i];
             int c2 = population[base + i + 1];
-            totalDist += distanceMatrix[c1 * CITY_COUNT + c2];
+            totalDist += sharedDistanceMatrix[c1 * CITY_COUNT + c2];
         }
         // return to start
         int c1 = population[base + CITY_COUNT - 1];
         int c2 = population[base];
-        totalDist += distanceMatrix[c1 * CITY_COUNT + c2];
+        totalDist += sharedDistanceMatrix[c1 * CITY_COUNT + c2];
 
         fitness[idx] = 1.0 / totalDist;
     }
 }
 
 // Kernel: Tournament selection
-__global__ void tournamentSelectionKernel(const double *fitness, int *selectedIndices, int POPULATION_SIZE, int tournamentSize, curandState_t *states)
+__global__ void tournamentSelectionKernel(const float *fitness, int *selectedIndices, int POPULATION_SIZE, int tournamentSize, curandState_t *states)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx < POPULATION_SIZE)
     {
         curandState_t localState = states[idx];
-        double bestFit = -1.0;
+        float bestFit = -1.0;
         int bestIdx = -1;
         for (int i = 0; i < tournamentSize; i++)
         {
             int cand = curand(&localState) % POPULATION_SIZE;
-            double f = fitness[cand];
+            float f = fitness[cand];
             if (f > bestFit)
             {
                 bestFit = f;
@@ -173,7 +181,7 @@ __global__ void crossoverKernel(const int *population, const int *selectedIndice
 }
 
 // Kernel: Mutation
-__global__ void mutationKernel(int *population, double mutationRate, curandState_t *states, int POPULATION_SIZE, int CITY_COUNT)
+__global__ void mutationKernel(int *population, float mutationRate, curandState_t *states, int POPULATION_SIZE, int CITY_COUNT)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx < POPULATION_SIZE)
@@ -206,9 +214,9 @@ City *initializeCities()
     return cities;
 }
 
-double *computeDistanceMatrix(const City *cities)
+float *computeDistanceMatrix(const City *cities)
 {
-    double *distMat = new double[CITY_COUNT * CITY_COUNT];
+    float *distMat = new float[CITY_COUNT * CITY_COUNT];
     for (int i = 0; i < CITY_COUNT; ++i)
     {
         for (int j = 0; j < CITY_COUNT; ++j)
@@ -217,8 +225,8 @@ double *computeDistanceMatrix(const City *cities)
                 distMat[i * CITY_COUNT + j] = 0.0;
             else
             {
-                double dx = cities[i].x - cities[j].x;
-                double dy = cities[i].y - cities[j].y;
+                float dx = cities[i].x - cities[j].x;
+                float dy = cities[i].y - cities[j].y;
                 distMat[i * CITY_COUNT + j] = sqrt(dx * dx + dy * dy);
             }
         }
@@ -272,9 +280,9 @@ void initializePopulationOnGPU(int *d_population, curandState_t *d_states)
     cudaFree(d_template);
 }
 
-double calculatePathDistance(const int *path, const double *distMat)
+float calculatePathDistance(const int *path, const float *distMat)
 {
-    double totalDist = 0.0;
+    float totalDist = 0.0;
     for (int i = 0; i < CITY_COUNT - 1; i++)
     {
         totalDist += distMat[path[i] * CITY_COUNT + path[i + 1]];
@@ -283,21 +291,21 @@ double calculatePathDistance(const int *path, const double *distMat)
     return totalDist;
 }
 
-__host__ void geneticAlgorithm(City* cities, double* h_distMat)
+__host__ void geneticAlgorithm(City* cities, float* h_distMat)
 {
     // Allocate distance matrix on GPU
-    double *d_distanceMatix;
-    CUDA_CHECK(cudaMalloc((void **)&d_distanceMatix, CITY_COUNT * CITY_COUNT * sizeof(double)));
-    CUDA_CHECK(cudaMemcpy(d_distanceMatix, h_distMat, CITY_COUNT * CITY_COUNT * sizeof(double), cudaMemcpyHostToDevice));
+    float *d_distanceMatix;
+    CUDA_CHECK(cudaMalloc((void **)&d_distanceMatix, CITY_COUNT * CITY_COUNT * sizeof(float)));
+    CUDA_CHECK(cudaMemcpy(d_distanceMatix, h_distMat, CITY_COUNT * CITY_COUNT * sizeof(float), cudaMemcpyHostToDevice));
 
     int *d_population;
     int *d_newPopulation;
-    double *d_fitness;
+    float *d_fitness;
     int *d_selectedIndices;
 
     CUDA_CHECK(cudaMalloc((void **)&d_population, POPULATION_SIZE * CITY_COUNT * sizeof(int)));
     CUDA_CHECK(cudaMalloc((void **)&d_newPopulation, POPULATION_SIZE * CITY_COUNT * sizeof(int)));
-    CUDA_CHECK(cudaMalloc((void **)&d_fitness, POPULATION_SIZE * sizeof(double)));
+    CUDA_CHECK(cudaMalloc((void **)&d_fitness, POPULATION_SIZE * sizeof(float)));
     CUDA_CHECK(cudaMalloc((void **)&d_selectedIndices, POPULATION_SIZE * sizeof(int)));
 
     // Setup RNG
@@ -315,21 +323,21 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
     int halfNonElite = nonEliteCount / 2;
     int cb = (nonEliteCount + threads - 1) / threads;
     int mutation_blocks = (nonEliteCount + threads - 1) / threads;
+    int sharedMemSize = CITY_COUNT * CITY_COUNT * sizeof(float);
 
-
-    double *result_check_fitness = new double[POPULATION_SIZE];
+    float *result_check_fitness = new float[POPULATION_SIZE];
 
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
         // Compute fitness
-        computeFitnessKernel<<<blocks, threads>>>(d_population, d_distanceMatix, d_fitness, POPULATION_SIZE, CITY_COUNT);
+        computeFitnessKernel<<<blocks, threads,sharedMemSize>>>(d_population, d_distanceMatix, d_fitness, POPULATION_SIZE, CITY_COUNT);
         cudaDeviceSynchronize();
 
         // Copy fitness to host and do elitism
-        double *h_fitness = new double[POPULATION_SIZE];
-        CUDA_CHECK(cudaMemcpy(h_fitness, d_fitness, POPULATION_SIZE * sizeof(double), cudaMemcpyDeviceToHost));
+        float *h_fitness = new float[POPULATION_SIZE];
+        CUDA_CHECK(cudaMemcpy(h_fitness, d_fitness, POPULATION_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
 
-        vector<pair<double, int>> fitIdx(POPULATION_SIZE);
+        vector<pair<float, int>> fitIdx(POPULATION_SIZE);
         for (int i = 0; i < POPULATION_SIZE; i++)
             fitIdx[i] = {h_fitness[i], i};
         sort(fitIdx.begin(), fitIdx.end(), greater<>());
@@ -376,8 +384,8 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
 
         if (PRINT_EACH_ITERATION && (gen % 50 == 0))
         {
-            CUDA_CHECK(cudaMemcpy(result_check_fitness, d_fitness, POPULATION_SIZE * sizeof(double), cudaMemcpyDeviceToHost));
-            double bestFit = result_check_fitness[0];
+            CUDA_CHECK(cudaMemcpy(result_check_fitness, d_fitness, POPULATION_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+            float bestFit = result_check_fitness[0];
             for (int i = 1; i < POPULATION_SIZE; i++)
             {
                 if (result_check_fitness[i] > bestFit)
@@ -385,7 +393,7 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
                     bestFit = result_check_fitness[i];
                 }
             }
-            double bestDistance = 1.0 / bestFit;
+            float bestDistance = 1.0 / bestFit;
             cout << "Generation " << gen << ": Best Distance = " << bestDistance << endl;
         }
     }
@@ -394,11 +402,11 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
     computeFitnessKernel<<<blocks, threads>>>(d_population, d_distanceMatix, d_fitness, POPULATION_SIZE, CITY_COUNT);
     cudaDeviceSynchronize();
 
-    double *h_fitness = new double[POPULATION_SIZE];
-    CUDA_CHECK(cudaMemcpy(h_fitness, d_fitness, POPULATION_SIZE * sizeof(double), cudaMemcpyDeviceToHost));
+    float *h_fitness = new float[POPULATION_SIZE];
+    CUDA_CHECK(cudaMemcpy(h_fitness, d_fitness, POPULATION_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
 
     int bestIdx = 0;
-    double bestFit = h_fitness[0];
+    float bestFit = h_fitness[0];
     for (int i = 1; i < POPULATION_SIZE; i++)
     {
         if (h_fitness[i] > bestFit)
@@ -412,7 +420,7 @@ __host__ void geneticAlgorithm(City* cities, double* h_distMat)
     CUDA_CHECK(cudaMemcpy(h_solution, d_population + bestIdx * CITY_COUNT, CITY_COUNT * sizeof(int), cudaMemcpyDeviceToHost));
 
     if (PRINT_EACH_ITERATION){
-        double bestDistance = 1.0 / bestFit;
+        float bestDistance = 1.0 / bestFit;
         cout << "Best distance: " << bestDistance << endl;
         cout << "Best path:" << endl;
         for (int i = 0; i < CITY_COUNT; i++)
@@ -455,7 +463,7 @@ int main(int argc, char* argv[])
 
 
     City *cities = initializeCities();
-    double *h_distMat = computeDistanceMatrix(cities);
+    float *h_distMat = computeDistanceMatrix(cities);
 
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
